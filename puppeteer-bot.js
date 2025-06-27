@@ -72,10 +72,16 @@ async function startBot() {
     try {
         // THIS IS THE FIX. We launch Puppeteer with no executablePath.
         // It will find the browser automatically.
-        browser = await puppeteer.launch({
-            headless: "new",
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
+     browser = await puppeteer.launch({
+    headless: "new",
+    timeout: 120000, // <-- INCREASED TIMEOUT to 2 minutes
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu' // <-- ADDED for stability in headless environments
+    ]
+});
 
         page = await browser.newPage();
         console.log("Navigating to Drednot.io...");
