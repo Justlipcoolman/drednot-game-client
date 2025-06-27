@@ -1,8 +1,7 @@
-// puppeteer-bot.js (Complete Uptime Robot Version)
+// puppeteer-bot.js (FINAL VERSION)
 
 const puppeteer = require('puppeteer');
-const { join } = require('path');
-const express = require('express'); // For the web server
+const express = require('express');
 
 // --- CONFIGURATION ---
 const BOT_SERVER_URL = process.env.BOT_SERVER_URL;
@@ -19,7 +18,6 @@ let messageQueue = [];
 let isProcessingQueue = false;
 
 // --- HELPER FUNCTIONS ---
-
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -68,19 +66,13 @@ async function processRemoteCommand(command, username, args) {
 }
 
 // --- MAIN BOT LOGIC ---
-
 async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
-        // This launch configuration is the one that works on Koyeb/Render
-        const executablePath = join(
-            __dirname, '.cache', 'puppeteer', 'chrome', 'linux-127.0.6533.88', 'chrome-linux64', 'chrome'
-        );
-        console.log(`Attempting to launch Chrome from: ${executablePath}`);
-        
+        // THIS IS THE FIX. We launch Puppeteer with no executablePath.
+        // It will find the browser automatically.
         browser = await puppeteer.launch({
-            executablePath: executablePath,
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         });
@@ -90,18 +82,14 @@ async function startBot() {
         await page.goto('https://drednot.io/', { waitUntil: 'networkidle2' });
         console.log("Page loaded. Looking for initial pop-ups...");
 
-        // Click through the welcome/login modals
-        console.log("Looking for the 'NOTICE' accept button...");
         await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
         await page.click('.modal-container .btn-green');
         console.log("Clicked 'Accept' on the notice.");
 
-        console.log("Looking for the 'Play Anonymously' button...");
         const playAnonymouslyButton = await page.waitForXPath("//button[contains(., 'Play Anonymously')]", { timeout: 10000 });
         await playAnonymouslyButton.click();
         console.log("Clicked 'Play Anonymously'. Modals cleared.");
         
-        console.log("Waiting for game interface to load...");
         await page.waitForSelector('#chat-input', { timeout: 60000 });
         
         console.log("✅ Guest joined successfully! Bot is in-game.");
@@ -109,7 +97,6 @@ async function startBot() {
 
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
-        // Inject the chat monitor
         await page.evaluate(() => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
@@ -131,7 +118,7 @@ async function startBot() {
                                 const args = parts;
                                 if (allCommands.includes(command)) {
                                     window.onCommandDetected(command, username, args);
-                                 }
+                                }
                             }
                         }
                     });
@@ -142,7 +129,7 @@ async function startBot() {
         });
 
     } catch (error) {
-        console.error("❌ A critical error occurred during bot startup:", error.message);
+        console.error("❌ A critical error occurred during bot startup:", error);
         if (browser) await browser.close();
         console.log("Bot will attempt to restart in 1 minute...");
         setTimeout(startBot, 60000);
@@ -150,17 +137,14 @@ async function startBot() {
 }
 
 // --- WEB SERVER FOR UPTIME ROBOT ---
-
 const app = express();
-const PORT = process.env.PORT || 8000; // Koyeb provides the PORT variable automatically
+const PORT = process.env.PORT || 8000;
 
-// This is the endpoint Uptime Robot will hit.
 app.get('/', (req, res) => {
   console.log("Ping received! Keeping the service alive.");
   res.status(200).send('Bot client is alive and running.');
 });
 
-// Start the web server and then start the bot logic.
 app.listen(PORT, () => {
   console.log(`Health check server listening on port ${PORT}`);
   startBot();
