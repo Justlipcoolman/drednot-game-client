@@ -1,6 +1,8 @@
-// puppeteer-bot.js (Final Version for Render)
+// puppeteer-bot.js (Final Corrected Version for Render)
 
 const puppeteer = require('puppeteer');
+const { join } = require('path');
+const { execSync } = require('child_process');
 
 // --- CONFIGURATION ---
 const BOT_SERVER_URL = process.env.BOT_SERVER_URL;
@@ -12,7 +14,10 @@ if (!BOT_SERVER_URL) {
     process.exit(1);
 }
 
-// ... (The helper functions: queueReply, processQueue, processRemoteCommand are UNCHANGED) ...
+let page;
+let messageQueue = [];
+let isProcessingQueue = false;
+
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -60,21 +65,31 @@ async function processRemoteCommand(command, username, args) {
     }
 }
 
-
 async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
-        // --- NEW: This is the crucial change ---
-        const browserFetcher = puppeteer.createBrowserFetcher();
-        const revisionInfo = await browserFetcher.download('127.0.6533.88'); // Exact version from your log
+        // --- CORRECTED CODE for modern Puppeteer ---
+        // This is the cache directory we configured in .puppeteerrc.cjs
+        const cacheDir = join(__dirname, '.cache', 'puppeteer');
+        
+        // Find the path to the Puppeteer CLI
+        const puppeteerCLI = join(__dirname, 'node_modules', 'puppeteer', 'lib', 'cjs', 'puppeteer', 'cli.js');
+
+        // Use the CLI to get the executable path
+        const executablePath = execSync(`node ${puppeteerCLI} resolve --browser chrome --path ${cacheDir}`).toString().trim();
+        console.log(`Found Chrome executable at: ${executablePath}`);
+
+        if (!executablePath) {
+            throw new Error("Could not resolve executable path for Chrome.");
+        }
 
         browser = await puppeteer.launch({
-            executablePath: revisionInfo.executablePath, // Tell Puppeteer exactly where the browser is
+            executablePath: executablePath, // Tell Puppeteer exactly where the browser is
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process', '--no-zygote', '--disable-gpu']
         });
-        // --- END OF CHANGE ---
+        // --- END OF CORRECTED CODE ---
 
         page = await browser.newPage();
         console.log("Navigating to Drednot.io to join as a guest...");
@@ -86,7 +101,6 @@ async function startBot() {
         console.log("✅ Guest joined successfully! Bot is in-game.");
         queueReply("In-Game Client Online.");
 
-        // ... (The rest of the file is UNCHANGED) ...
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
         await page.evaluate(() => {
@@ -110,7 +124,7 @@ async function startBot() {
                                 const args = parts;
                                 if (allCommands.includes(command)) {
                                     window.onCommandDetected(command, username, args);
-                                }
+                                 }
                             }
                         }
                     });
