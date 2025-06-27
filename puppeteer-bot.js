@@ -1,25 +1,24 @@
-// puppeteer-bot.js
+// puppeteer-bot.js (Guest Version)
 
 const puppeteer = require('puppeteer');
 
 // --- CONFIGURATION ---
-// These are loaded from Render's Environment Variables
-const DREDNOT_USERNAME = process.env.DREDNOT_USERNAME;
-const DREDNOT_PASSWORD = process.env.DREDNOT_PASSWORD;
+// We ONLY need the URL to the main economy bot server.
 const BOT_SERVER_URL = process.env.BOT_SERVER_URL; // e.g., 'https://your-main-bot.onrender.com/command'
 const API_KEY = 'drednot123'; // Must match the key in your main economy server
 
-const MESSAGE_DELAY = 1200; // Delay between sending chat messages to not get flagged
+const MESSAGE_DELAY = 1200;
 
-if (!DREDNOT_USERNAME || !DREDNOT_PASSWORD || !BOT_SERVER_URL) {
-    console.error("CRITICAL: DREDNOT_USERNAME, DREDNOT_PASSWORD, or BOT_SERVER_URL environment variables not set!");
-    process.exit(1); // Exit if credentials or URL are not found
+if (!BOT_SERVER_URL) {
+    console.error("CRITICAL: BOT_SERVER_URL environment variable is not set! This bot doesn't know where to send commands.");
+    process.exit(1);
 }
 
 let page;
 let messageQueue = [];
 let isProcessingQueue = false;
 
+// The helper functions (queueReply, processQueue, processRemoteCommand) are unchanged.
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -74,45 +73,24 @@ async function startBot() {
     try {
         browser = await puppeteer.launch({
             headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process', '--no-zygote', '--disable-gpu']
         });
         page = await browser.newPage();
-        console.log("Navigating to Drednot.io...");
+        console.log("Navigating to Drednot.io to join as a guest...");
         await page.goto('https://drednot.io/', { waitUntil: 'networkidle2' });
-        console.log("Page loaded. Attempting login...");
 
-        // ===================================================================
-        // === THIS IS THE PART YOU MUST EDIT WITH YOUR BROWSER'S DEVTOOLS ===
-        // === Use "Inspect Element" to find the real selectors.           ===
-        // ===================================================================
-        
-        // These are placeholders. They WILL NOT WORK without being changed.
-        await page.waitForSelector('.login-button', { timeout: 30000 }); // Replace with real selector
-        await page.click('.login-button');
-
-        await page.waitForSelector('input[name="username"]'); // Replace with real selector
-        await page.type('input[name="username"]', DREDNOT_USERNAME);
-        
-        await page.waitForSelector('input[name="password"]'); // Replace with real selector
-        await page.type('input[name="password"]', DREDNOT_PASSWORD);
-
-        await page.click('button[type="submit"]'); // Replace with real selector
-        // ===================================================================
-
-        console.log("Login submitted. Waiting for game interface...");
+        // Since we are a guest, there is NO login step.
+        // We just need to wait for the game to load.
+        // The chat input appearing is a great sign that we are in.
+        console.log("Waiting for game interface to load...");
         await page.waitForSelector('#chat-input', { timeout: 60000 });
-        console.log("✅ Login successful! Bot is in-game.");
+        
+        console.log("✅ Guest joined successfully! Bot is in-game.");
         queueReply("In-Game Client Online.");
 
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
+        // The chat monitor logic is unchanged.
         await page.evaluate(() => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
@@ -148,7 +126,7 @@ async function startBot() {
         console.error("❌ A critical error occurred during bot startup:", error.message);
         if (browser) await browser.close();
         console.log("Bot will attempt to restart in 1 minute...");
-        setTimeout(startBot, 60000); // Attempt a restart after a delay
+        setTimeout(startBot, 60000);
     }
 }
 
