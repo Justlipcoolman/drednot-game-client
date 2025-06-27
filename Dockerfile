@@ -4,25 +4,32 @@ FROM node:22-slim
 # Set the working directory
 WORKDIR /workspace
 
-# Install the system dependencies that Puppeteer's Chrome needs.
-# This is the most important part that fixes your error.
-RUN apt-get update && apt-get install -yq --no-install-recommends \
+# Install the COMPLETE set of system dependencies that Puppeteer's Chrome needs.
+# This new list includes libdrm2 and is more robust.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-liberation \
     gconf-service \
+    libappindicator1 \
     libasound2 \
-    libatk1.0-0 \
     libatk-bridge2.0-0 \
+    libatk1.0-0 \
     libc6 \
     libcairo2 \
     libcups2 \
     libdbus-1-3 \
+    libdrm2 \
     libexpat1 \
     libfontconfig1 \
+    libgbm1 \
     libgcc1 \
     libgconf-2-4 \
     libgdk-pixbuf2.0-0 \
     libglib2.0-0 \
     libgtk-3-0 \
     libnspr4 \
+    libnss3 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libstdc++6 \
@@ -39,16 +46,12 @@ RUN apt-get update && apt-get install -yq --no-install-recommends \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    ca-certificates \
-    fonts-liberation \
-    libappindicator1 \
-    libnss3 \
     lsb-release \
-    xdg-utils \
     wget \
-    --fix-missing
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package files and install Node.js dependencies
+# Copy package files and install Node.js dependencies, forcing browser download
 COPY package*.json ./
 RUN PUPPETEER_SKIP_DOWNLOAD=false npm install --production
 
