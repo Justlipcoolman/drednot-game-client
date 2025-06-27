@@ -1,4 +1,4 @@
-// puppeteer-bot.js (Final Hard-coded Path Version for Render)
+// puppeteer-bot.js (Version with Pop-up Clicking)
 
 const puppeteer = require('puppeteer');
 const { join } = require('path');
@@ -70,29 +70,44 @@ async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
-        // --- FINAL, SIMPLIFIED SOLUTION ---
-        // We construct the path directly based on the build logs.
+        // We use the most recent working launch configuration.
         const executablePath = join(
-            __dirname,
-            '.cache',
-            'puppeteer',
-            'chrome',
-            'linux-127.0.6533.88', // This version number MUST match your build log
-            'chrome-linux64',
-            'chrome'
+            __dirname, '.cache', 'puppeteer', 'chrome', 'linux-127.0.6533.88', 'chrome-linux64', 'chrome'
         );
         console.log(`Attempting to launch Chrome from: ${executablePath}`);
         
         browser = await puppeteer.launch({
-            executablePath: executablePath, // Tell Puppeteer exactly where the browser is
+            executablePath: executablePath,
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         });
-        // --- END OF SOLUTION ---
 
         page = await browser.newPage();
-        console.log("Navigating to Drednot.io to join as a guest...");
-        await page.goto('https://drednot.io/', { waitUntil: 'networkidle2' });
+        console.log("Navigating to Drednot.io...");
+        await page.goto('https://drednot.io/invite/wQcS5UHUS5wkGVCKvSDyTMa_', { waitUntil: 'networkidle2' });
+        console.log("Page loaded. Looking for initial pop-ups...");
+
+        // ==========================================================
+        // === NEW CODE: Click through the welcome/login modals ===
+        // ==========================================================
+
+        // Step 1: Click the "Accept" button on the first modal.
+        // We find the button with the class .btn-green inside the modal.
+        console.log("Looking for the 'NOTICE' accept button...");
+        await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
+        await page.click('.modal-container .btn-green');
+        console.log("Clicked 'Accept' on the notice.");
+
+        // Step 2: Click the "Play Anonymously" button on the second modal.
+        // We find the button that contains the text "Play Anonymously".
+        console.log("Looking for the 'Play Anonymously' button...");
+        const playAnonymouslyButton = await page.waitForXPath("//button[contains(., 'Play Anonymously')]", { timeout: 10000 });
+        await playAnonymouslyButton.click();
+        console.log("Clicked 'Play Anonymously'. Modals cleared.");
+
+        // ==========================================================
+        // === END OF NEW CODE                                    ===
+        // ==========================================================
         
         console.log("Waiting for game interface to load...");
         await page.waitForSelector('#chat-input', { timeout: 60000 });
