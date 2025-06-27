@@ -1,0 +1,8 @@
+# Dependencies and downloaded packages
+/node_modules
+
+# Puppeteer's downloaded browser cache
+/.cache
+
+# Log files
+*.log
