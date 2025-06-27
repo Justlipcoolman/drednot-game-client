@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -yq --no-install-recommends \
 
 # Copy package files and install Node.js dependencies
 COPY package*.json ./
-RUN npm install --production
+RUN PUPPETEER_SKIP_DOWNLOAD=false npm install --production
 
 # Copy the rest of your application code
 COPY . .
