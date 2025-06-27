@@ -1,24 +1,18 @@
-// puppeteer-bot.js (Guest Version)
+// puppeteer-bot.js (Final Version for Render)
 
 const puppeteer = require('puppeteer');
 
 // --- CONFIGURATION ---
-// We ONLY need the URL to the main economy bot server.
-const BOT_SERVER_URL = process.env.BOT_SERVER_URL; // e.g., 'https://your-main-bot.onrender.com/command'
-const API_KEY = 'drednot123'; // Must match the key in your main economy server
-
+const BOT_SERVER_URL = process.env.BOT_SERVER_URL;
+const API_KEY = 'drednot123';
 const MESSAGE_DELAY = 1200;
 
 if (!BOT_SERVER_URL) {
-    console.error("CRITICAL: BOT_SERVER_URL environment variable is not set! This bot doesn't know where to send commands.");
+    console.error("CRITICAL: BOT_SERVER_URL environment variable is not set!");
     process.exit(1);
 }
 
-let page;
-let messageQueue = [];
-let isProcessingQueue = false;
-
-// The helper functions (queueReply, processQueue, processRemoteCommand) are unchanged.
+// ... (The helper functions: queueReply, processQueue, processRemoteCommand are UNCHANGED) ...
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -71,26 +65,30 @@ async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
+        // --- NEW: This is the crucial change ---
+        const browserFetcher = puppeteer.createBrowserFetcher();
+        const revisionInfo = await browserFetcher.download('127.0.6533.88'); // Exact version from your log
+
         browser = await puppeteer.launch({
+            executablePath: revisionInfo.executablePath, // Tell Puppeteer exactly where the browser is
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process', '--no-zygote', '--disable-gpu']
         });
+        // --- END OF CHANGE ---
+
         page = await browser.newPage();
         console.log("Navigating to Drednot.io to join as a guest...");
         await page.goto('https://drednot.io/', { waitUntil: 'networkidle2' });
-
-        // Since we are a guest, there is NO login step.
-        // We just need to wait for the game to load.
-        // The chat input appearing is a great sign that we are in.
+        
         console.log("Waiting for game interface to load...");
         await page.waitForSelector('#chat-input', { timeout: 60000 });
         
         console.log("✅ Guest joined successfully! Bot is in-game.");
         queueReply("In-Game Client Online.");
 
+        // ... (The rest of the file is UNCHANGED) ...
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
-        // The chat monitor logic is unchanged.
         await page.evaluate(() => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
