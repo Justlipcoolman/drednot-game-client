@@ -2,7 +2,7 @@
 
 const puppeteer = require('puppeteer');
 const { join } = require('path');
-
+const port = 3000;
 // --- CONFIGURATION ---
 const BOT_SERVER_URL = process.env.BOT_SERVER_URL;
 const API_KEY = 'drednot123';
