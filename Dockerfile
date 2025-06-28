@@ -7,7 +7,7 @@ WORKDIR /workspace
 # Install the lightweight Chromium browser and its dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    chromium-browser \
+    chromium \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
