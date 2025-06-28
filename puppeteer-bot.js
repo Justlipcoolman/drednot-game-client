@@ -14,7 +14,8 @@ if (!BOT_SERVER_URL) {
     console.error("CRITICAL: BOT_SERVER_URL environment variable is not set!");
     process.exit(1);
 }
-
+let messageQueue = [];
+let isProcessingQueue = false;
 let page;
 let browser;
 let inactivityTimer;
