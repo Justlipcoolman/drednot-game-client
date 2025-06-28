@@ -1,6 +1,6 @@
-// puppeteer-bot.js (FINAL CHROMIUM VERSION)
+// puppeteer-bot.js (FINAL CHROMIUM VERSION - API FIX)
 
-const puppeteer = require('puppeteer-core'); // <-- Using puppeteer-core
+const puppeteer = require('puppeteer-core');
 const express = require('express');
 
 // --- CONFIGURATION ---
@@ -17,7 +17,7 @@ let page;
 let messageQueue = [];
 let isProcessingQueue = false;
 
-// --- HELPER FUNCTIONS --- (No changes here)
+// --- HELPER FUNCTIONS ---
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -61,12 +61,10 @@ async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
-        // THIS IS THE KEY FIX: We point to the lightweight Chromium browser
-        // installed by our Dockerfile and use a full set of stability args.
         browser = await puppeteer.launch({
-            executablePath: '/usr/bin/chromium', // <-- Path to system-installed Chromium
+            executablePath: '/usr/bin/chromium',
             headless: "new",
-            timeout: 600000,
+            timeout: 60000,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -77,15 +75,15 @@ async function startBot() {
 
         page = await browser.newPage();
         console.log("Navigating to Drednot.io...");
-        // Increased timeout just in case the site is slow to load
-        await page.goto('https://drednot.io/invite/wQcS5UHUS5wkGVCKvSDyTMa_', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://drednot.io/', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("Page loaded. Looking for initial pop-ups...");
 
         await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
         await page.click('.modal-container .btn-green');
         console.log("Clicked 'Accept' on the notice.");
 
-        const playAnonymouslyButton = await page.waitForXPath("//button[contains(., 'Play Anonymously')]", { timeout: 10000 });
+        // THIS IS THE FIX: Using the new waitForSelector API for XPath
+        const playAnonymouslyButton = await page.waitForSelector('xpath///button[contains(., "Play Anonymously")]', { timeout: 10000 });
         await playAnonymouslyButton.click();
         console.log("Clicked 'Play Anonymously'. Modals cleared.");
         
@@ -96,7 +94,7 @@ async function startBot() {
 
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
-        // Chat monitor code (no changes here)
+        // Chat monitor code
         await page.evaluate(() => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
@@ -133,7 +131,7 @@ async function startBot() {
     }
 }
 
-// --- WEB SERVER FOR UPTIME ROBOT --- (No changes here)
+// --- WEB SERVER FOR UPTIME ROBOT ---
 const app = express();
 const PORT = process.env.PORT || 8000;
 app.get('/', (req, res) => {
