@@ -75,7 +75,7 @@ async function startBot() {
 
         page = await browser.newPage();
         console.log("Navigating to Drednot.io...");
-        await page.goto('https://drednot.io/', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://drednot.io/invite/wQcS5UHUS5wkGVCKvSDyTMa_', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("Page loaded. Looking for initial pop-ups...");
 
         await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
