@@ -1,4 +1,4 @@
-// puppeteer-bot.js (FINAL CHROMIUM VERSION - API FIX)
+// puppeteer-bot.js (FINAL VERSION w/ USERSCRIPT LOGIC)
 
 const puppeteer = require('puppeteer-core');
 const express = require('express');
@@ -6,7 +6,8 @@ const express = require('express');
 // --- CONFIGURATION ---
 const BOT_SERVER_URL = process.env.BOT_SERVER_URL;
 const API_KEY = 'drednot123';
-const MESSAGE_DELAY = 1200;
+const MESSAGE_DELAY = 1200; // Increased delay slightly for stability
+const ZWSP = '\u200B'; // Zero-Width Space to prevent self-triggering
 
 if (!BOT_SERVER_URL) {
     console.error("CRITICAL: BOT_SERVER_URL environment variable is not set!");
@@ -20,14 +21,40 @@ let isProcessingQueue = false;
 // --- HELPER FUNCTIONS ---
 async function queueReply(message) {
     const MAX_LENGTH = 199;
-    const lines = Array.isArray(message) ? message : [message];
-    lines.forEach(line => {
-        let remaining = String(line);
-        while (remaining.length > 0) {
-            messageQueue.push(remaining.substring(0, MAX_LENGTH));
-            remaining = remaining.substring(MAX_LENGTH);
+
+    // THE FIX: Adopting the more robust message splitting from the userscript
+    const splitLongMessage = (line) => {
+        const chunks = [];
+        const strLine = String(line);
+        if (strLine.length <= MAX_LENGTH) {
+            chunks.push(strLine);
+            return chunks;
         }
+        let remainingText = strLine;
+        while (remainingText.length > 0) {
+            if (remainingText.length <= MAX_LENGTH) {
+                chunks.push(remainingText);
+                break;
+            }
+            let breakPoint = remainingText.lastIndexOf(' ', MAX_LENGTH);
+            if (breakPoint <= 0) breakPoint = MAX_LENGTH;
+            chunks.push(remainingText.substring(0, breakPoint).trim());
+            remainingText = remainingText.substring(breakPoint).trim();
+        }
+        return chunks;
+    };
+
+    const linesToProcess = Array.isArray(message) ? message : [message];
+    linesToProcess.forEach(singleLine => {
+        const messageChunks = splitLongMessage(singleLine);
+        messageChunks.forEach(chunk => {
+            if (chunk) {
+                // THE FIX: Adding the Zero-Width-Space prefix to our messages
+                messageQueue.push(ZWSP + chunk);
+            }
+        });
     });
+
     if (!isProcessingQueue) processQueue();
 }
 
@@ -35,11 +62,34 @@ async function processQueue() {
     if (messageQueue.length === 0) { isProcessingQueue = false; return; }
     isProcessingQueue = true;
     const message = messageQueue.shift();
+
     try {
-        await page.type('#chat-input', message, { delay: 20 });
+        // THE FIX: Replicating the userscript's send logic
+        // 1. Check if chat is closed
+        const isChatClosed = await page.evaluate(() => {
+            const chatBox = document.querySelector('#chat');
+            return chatBox ? chatBox.classList.contains('closed') : false;
+        });
+
+        // 2. If it's closed, click send once to open it
+        if (isChatClosed) {
+            await page.click('#chat-send');
+            await new Promise(resolve => setTimeout(resolve, 100)); // Short delay for UI
+        }
+
+        // 3. Directly set the input value
+        await page.evaluate((msg) => {
+            const chatInput = document.querySelector('#chat-input');
+            if (chatInput) chatInput.value = msg;
+        }, message);
+
+        // 4. Click send to submit the message
         await page.click('#chat-send');
-        console.log(`[BOT-SENT] ${message}`);
-    } catch (error) { console.error(`Error sending message: "${message}". Error: ${error.message}`); }
+        console.log(`[BOT-SENT] ${message.substring(1)}`); // Log without the ZWSP
+
+    } catch (error) {
+        console.error(`Error sending message. Error: ${error.message}`);
+    }
     setTimeout(processQueue, MESSAGE_DELAY);
 }
 
@@ -65,37 +115,36 @@ async function startBot() {
             executablePath: '/usr/bin/chromium',
             headless: "new",
             timeout: 60000,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
         });
 
         page = await browser.newPage();
-        console.log("Navigating to Drednot.io...");
+        // THE FIX: The new URL with your invite code
+        console.log("Navigating to Drednot.io invite link...");
         await page.goto('https://drednot.io/invite/wQcS5UHUS5wkGVCKvSDyTMa_', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("Page loaded. Looking for initial pop-ups...");
 
-        await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
-        await page.click('.modal-container .btn-green');
-        console.log("Clicked 'Accept' on the notice.");
+        // This part is for the initial cookie/notice pop-ups
+        try {
+            await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
+            await page.click('.modal-container .btn-green');
+            console.log("Clicked 'Accept' on the notice.");
 
-        // THIS IS THE FIX: Using the new waitForSelector API for XPath
-        const playAnonymouslyButton = await page.waitForSelector('xpath///button[contains(., "Play Anonymously")]', { timeout: 10000 });
-        await playAnonymouslyButton.click();
-        console.log("Clicked 'Play Anonymously'. Modals cleared.");
-        
+            const playAnonymouslyButton = await page.waitForSelector('xpath///button[contains(., "Play Anonymously")]', { timeout: 10000 });
+            await playAnonymouslyButton.click();
+            console.log("Clicked 'Play Anonymously'.");
+        } catch(e) {
+            console.log("No initial pop-ups found, or already in game. Continuing...");
+        }
+
         await page.waitForSelector('#chat-input', { timeout: 60000 });
-        
         console.log("✅ Guest joined successfully! Bot is in-game.");
         queueReply("In-Game Client Online.");
 
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
         // Chat monitor code
-        await page.evaluate(() => {
+        await page.evaluate((ZWSP) => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
             const observer = new MutationObserver(mutations => {
@@ -103,6 +152,8 @@ async function startBot() {
                     mutation.addedNodes.forEach(node => {
                         if (node.nodeType === 1 && node.tagName === "P") {
                             const pText = node.textContent || "";
+                            if (pText.startsWith(ZWSP)) return; // Ignore our own ZWSP-prefixed messages
+
                             const colonIdx = pText.indexOf(':');
                             if (colonIdx === -1) return;
                             const bdiElement = node.querySelector("bdi");
@@ -121,7 +172,7 @@ async function startBot() {
             });
             observer.observe(chatContent, { childList: true, subtree: true });
             console.log("In-page chat monitor has been activated.");
-        });
+        }, ZWSP); // Pass ZWSP into the evaluate function
 
     } catch (error) {
         console.error("❌ A critical error occurred during bot startup:", error);
