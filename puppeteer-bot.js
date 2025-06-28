@@ -66,6 +66,7 @@ async function startBot() {
         browser = await puppeteer.launch({
             executablePath: '/usr/bin/chromium', // <-- Path to system-installed Chromium
             headless: "new",
+            timeout: 60000,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
