@@ -1,6 +1,6 @@
-// puppeteer-bot.js (FINAL VERSION)
+// puppeteer-bot.js (FINAL CHROMIUM VERSION)
 
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core'); // <-- Using puppeteer-core
 const express = require('express');
 
 // --- CONFIGURATION ---
@@ -17,7 +17,7 @@ let page;
 let messageQueue = [];
 let isProcessingQueue = false;
 
-// --- HELPER FUNCTIONS ---
+// --- HELPER FUNCTIONS --- (No changes here)
 async function queueReply(message) {
     const MAX_LENGTH = 199;
     const lines = Array.isArray(message) ? message : [message];
@@ -32,19 +32,14 @@ async function queueReply(message) {
 }
 
 async function processQueue() {
-    if (messageQueue.length === 0) {
-        isProcessingQueue = false;
-        return;
-    }
+    if (messageQueue.length === 0) { isProcessingQueue = false; return; }
     isProcessingQueue = true;
     const message = messageQueue.shift();
     try {
         await page.type('#chat-input', message, { delay: 20 });
         await page.click('#chat-send');
         console.log(`[BOT-SENT] ${message}`);
-    } catch (error) {
-        console.error(`Error sending message: "${message}". Error: ${error.message}`);
-    }
+    } catch (error) { console.error(`Error sending message: "${message}". Error: ${error.message}`); }
     setTimeout(processQueue, MESSAGE_DELAY);
 }
 
@@ -57,12 +52,8 @@ async function processRemoteCommand(command, username, args) {
             body: JSON.stringify({ command, username, args })
         });
         const data = await response.json();
-        if (data.reply) {
-            queueReply(data.reply);
-        }
-    } catch (error) {
-        console.error("[API-ERROR] Failed to contact economy server:", error);
-    }
+        if (data.reply) { queueReply(data.reply); }
+    } catch (error) { console.error("[API-ERROR] Failed to contact economy server:", error); }
 }
 
 // --- MAIN BOT LOGIC ---
@@ -70,22 +61,23 @@ async function startBot() {
     console.log("Launching headless browser... This may take a moment.");
     let browser;
     try {
-        // THIS IS THE FIX. We launch Puppeteer with no executablePath.
-        // It will find the browser automatically.
-     browser = await puppeteer.launch({
-    headless: "new",
-    timeout: 120000, // <-- INCREASED TIMEOUT to 2 minutes
-    args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu' // <-- ADDED for stability in headless environments
-    ]
-});
+        // THIS IS THE KEY FIX: We point to the lightweight Chromium browser
+        // installed by our Dockerfile and use a full set of stability args.
+        browser = await puppeteer.launch({
+            executablePath: '/usr/bin/chromium-browser', // <-- Path to system-installed Chromium
+            headless: "new",
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu'
+            ]
+        });
 
         page = await browser.newPage();
         console.log("Navigating to Drednot.io...");
-        await page.goto('https://drednot.io/', { waitUntil: 'networkidle2' });
+        // Increased timeout just in case the site is slow to load
+        await page.goto('https://drednot.io/', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("Page loaded. Looking for initial pop-ups...");
 
         await page.waitForSelector('.modal-container .btn-green', { timeout: 10000 });
@@ -103,10 +95,10 @@ async function startBot() {
 
         await page.exposeFunction('onCommandDetected', processRemoteCommand);
 
+        // Chat monitor code (no changes here)
         await page.evaluate(() => {
             const chatContent = document.getElementById("chat-content");
             const allCommands = ["bal","balance","craft","cs","csb","crateshopbuy","daily","eat","flip","gather","info","inv","inventory","lb","leaderboard","m","market","marketbuy","marketcancel","marketsell","mb","mc","ms","n","next","p","pay","previous","recipes","slots","smelt","timers","traitroll","traits","verify","work"];
-
             const observer = new MutationObserver(mutations => {
                 mutations.forEach(mutation => {
                     mutation.addedNodes.forEach(node => {
@@ -122,9 +114,7 @@ async function startBot() {
                                 const parts = msgTxt.slice(1).trim().split(/ +/);
                                 const command = parts.shift().toLowerCase();
                                 const args = parts;
-                                if (allCommands.includes(command)) {
-                                    window.onCommandDetected(command, username, args);
-                                }
+                                if (allCommands.includes(command)) { window.onCommandDetected(command, username, args); }
                             }
                         }
                     });
@@ -142,15 +132,13 @@ async function startBot() {
     }
 }
 
-// --- WEB SERVER FOR UPTIME ROBOT ---
+// --- WEB SERVER FOR UPTIME ROBOT --- (No changes here)
 const app = express();
 const PORT = process.env.PORT || 8000;
-
 app.get('/', (req, res) => {
   console.log("Ping received! Keeping the service alive.");
   res.status(200).send('Bot client is alive and running.');
 });
-
 app.listen(PORT, () => {
   console.log(`Health check server listening on port ${PORT}`);
   startBot();
