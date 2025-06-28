@@ -64,7 +64,7 @@ async function startBot() {
         // THIS IS THE KEY FIX: We point to the lightweight Chromium browser
         // installed by our Dockerfile and use a full set of stability args.
         browser = await puppeteer.launch({
-            executablePath: '/usr/bin/chromium-browser', // <-- Path to system-installed Chromium
+            executablePath: '/usr/bin/chromium', // <-- Path to system-installed Chromium
             headless: "new",
             args: [
                 '--no-sandbox',
